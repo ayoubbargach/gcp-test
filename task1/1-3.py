@@ -3,6 +3,7 @@
 from google.cloud import storage
 from google.cloud.exceptions import NotFound
 from google.api_core.exceptions import Forbidden
+from matplotlib import pyplot as plt
 import os
 import time
 import threading
@@ -12,7 +13,7 @@ import threading
 
 # Init global variables
 bucket_name = 'noyau-gcptest'
-number_tests = 2
+number_tests = 5
 
 # Instantiates a client
 storage_client = storage.Client.from_service_account_json('../key.json')
@@ -62,7 +63,7 @@ class Bkt:
 
 	def get_blob_as_string(self, blob_name):
 		blob = self.bucket.blob(blob_name)
-		blob.download_as_string()
+		str_value = blob.download_as_string()
 
 		print('String {} downloaded from {}'.format(str_value, blob_name))
 
@@ -75,6 +76,7 @@ class Bkt:
 		blobs = self.get_all_blobs()
 		for blob in blobs :
 			blob.delete()
+		print("All blobs of the bucket have been deleted !")
 
 	def get_bkt(self):
 		return self.bucket
@@ -92,17 +94,25 @@ def get_bandwidth( file_size, timestamp1, timestamp2 ):
 	return round( file_size / (timestamp2 - timestamp1) )
 
 def draw( data, title, XLabel, YLabel ):
-	index = range( 1, number_tests )
-	average = sum(data) / len(data)
-	print("Average of "+title+" = "+str(average))
+	index = range( 1, 3 )
+	average_tab = []
+
+	average_up = sum(data[:number_tests]) / len(data[:number_tests])
+	average_down = sum(data[number_tests:]) / len(data[number_tests:])
+
+	print("Average of up -> "+title+" = "+str(average_up))
+	print("Average of down <- "+title+" = "+str(average_down))
 	print("Max = "+str(max(data)))
 	print("Min = "+str(min(data)))
+
+	average_tab.append(average_up)
+	average_tab.append(average_down)
 	
-	plt.bar(index, data, width=0.5, color='r')
+	print(data)
+	plt.bar(index, average_tab, width=0.5, color='r')
 	plt.title(title)
 	plt.xlabel(XLabel)
 	plt.ylabel(YLabel)
-	plt.plot(average, color='g')
 	plt.show()
 	plt.close()
 
@@ -155,7 +165,10 @@ def main():
 		timestamp1 = time.time()
 		b.get_blob( "file2"+str(i), "files/return"+str(i)+".data" )
 		timestamp2 = time.time()
-		print( os.path.getsize( "files/return"+str(i)+".data" ) )
+		if os.path.getsize( "files/return"+str(i)+".data" ) == file_size2 :
+			print( "Number of bytes correct : Download OK" )
+		else :
+			print( "Download uncomplete" )
 		# os.remove( "files/return"+i+".jpeg" )
 
 		seq_bandwidth_result.append( get_bandwidth( file_size2, timestamp1, timestamp2 ))
@@ -169,7 +182,7 @@ def main():
 		timestamp1 = time.time()
 		
 		for j in range(4):
-			t = threading.Thread(target=add_blob, args=[b, "file1"+str(i)+str(j), "files/file1.data"])
+			t = threading.Thread(target=b.add_blob, args=["file1"+str(i)+str(j), "files/file1.data"])
 			threads.append(t)
 			t.start()
 
@@ -185,7 +198,7 @@ def main():
 		timestamp1 = time.time()
 		
 		for j in range(4):
-			t = threading.Thread(target=get_blob, args=[b, "file1"+str(i)+str(j), "files/result"+str(i)+str(j)+".data"])
+			t = threading.Thread(target=b.get_blob, args=["file1"+str(i)+str(j), "files/result"+str(i)+str(j)+".data"])
 			threads.append(t)
 			t.start()
 
